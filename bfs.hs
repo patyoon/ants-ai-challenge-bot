@@ -1,6 +1,3 @@
-{-# OPTIONS  -XScopedTypeVariables #-}
-
-
 module BFS where
 import Ants
 -- Ants also has type Nothing
@@ -13,6 +10,14 @@ import qualified Data.List as List
 import Prelude
 import Debug.Trace (trace)
 import System.IO
+import System.Random (randomRIO)
+import Control.Monad
+
+pick :: [(Point, Int)] -> IO (Point, Int)
+pick xs
+  | all ((== 0) . snd) xs = do return $ head xs
+  | otherwise = randomRIO (0, (length xs - 1)) >>= return . (xs !!)
+
 
 --Recursive function that performs the breadth first search
 bfs :: GameState ->
@@ -30,7 +35,7 @@ bfs gs queue reached = if (head queue) `elem` (unexplored gs)
 getNeighbors :: GameState -> Point -> [Point] -> [Point]
 getNeighbors gs p reached =
   [child | child <- [nc, wc, sc, ec], tile ((world gs) %! child)
-                                      `notElem` [Unknown, Water, MyHill],
+                                      `notElem` [Water, MyHill],
    child `notElem` reached] where
       nc = moveW (world gs) North p
       wc = moveW (world gs) West p
@@ -43,7 +48,7 @@ exploreMap gs ant
   = let dest =  bfs gs [point ant] [point ant]
         dir = directions (world gs) (point ant) (Maybe.fromMaybe (0, 0) dest)
         possible_order = List.find (passable (world gs)) [Order {ant = ant, direction = fst dir},
-                                                                       Order {ant = ant, direction = snd dir}] in
+                                                          Order {ant = ant, direction = snd dir}] in
     if Maybe.isNothing dest then Just (Order {ant = ant, direction = Ants.North}, Set.empty)
     else case possible_order of
       Maybe.Nothing -> Maybe.Nothing
@@ -52,23 +57,25 @@ exploreMap gs ant
 -- new exploration method!
 
 -- Adds root point to the queue and initiates BFS
-exploreMap2 :: GameState -> Ant -> Maybe Order
-exploreMap2 gs ant = case getNeighbors gs (point ant) [] of
-  [] -> Maybe.Nothing
-  children -> let dir = sortBy sortTup $map (new_bfs gs) children
-                  d = directions (world gs) (point ant) $(fst . head) dir
-                  possible_order = find (passable
-                                         (world gs)) [Order {ant = ant,
-                                                             direction = fst d},
-                                                      Order {ant = ant,
-                                                             direction = snd d}]
-              in case possible_order of
-                Maybe.Nothing -> Maybe.Nothing
-                Just order -> Just order
+exploreMap2 :: GameState -> Ant -> IO (Maybe Order)
+exploreMap2 gs ant =
+  case getNeighbors gs (point ant) [] of
+    [] -> return (Maybe.Nothing)
+    children -> do choice <- pick (sortBy sortTup $map (new_bfs gs) children)
+                   let d = directions (world gs) (point ant) $fst choice
+                       possible_order = find (passable
+                                           (world gs)) [Order {ant = ant,
+                                                               direction = fst d},
+                                                        Order {ant = ant,
+                                                               direction = snd d}]
+                     in case possible_order of
+                     Maybe.Nothing -> return (Maybe.Nothing)
+                     Just order -> return (Just order)
 
 sortTup (a1, b1) (a2, b2)
   | b1 < b2 = GT
-  | b1 > b2 = LT| b1 == b2 = compare b1 b2
+  | b1 > b2 = LT
+  | b1 == b2 = EQ
 
 new_bfs :: GameState -> Point -> (Point, Int)
 new_bfs gs p = (p, val) where

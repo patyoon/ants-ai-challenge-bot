@@ -1,6 +1,6 @@
 module Main where
 import Data.List
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, catMaybes)
 import System.IO
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -31,6 +31,23 @@ doTurn gp gs = do
     -- check the remaining time
   elapsedTime <- timeRemaining gs
   hPutStrLn stderr $ show elapsedTime
+  maybeExploreOrders <- mapM (exploreMap2 gs) freeAnts
+  let exploreOrders = catMaybes maybeExploreOrders
+      expTurn = updateTurn (world gs) (Turn {pointOrders = Map.empty, foodToAnts = Map.empty})
+                    exploreOrders
+          -- combat orders
+      freeAnts2 = [myant | myant <- myAnts (ants gs),
+                       myant `notElem` (map ant (Map.elems (pointOrders expTurn)))]
+          --unblock our hills to enable spawning of our ants
+      hillOrders = [[Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = North},
+                         Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = West},
+                         Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = South},
+                         Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = East}]
+                       | h <- (hills gs),
+                         (hillPoint h) `elem` (map point (myAnts (ants gs)))]
+      unblockHillsOrders = mapMaybe (tryOrder (world gs)) hillOrders
+      hillTurn = updateTurn (world gs) expTurn unblockHillsOrders
+      orders = Map.elems $ pointOrders hillTurn
   -- wrap list of orders back into a monad
   return orders where
     foodOrders = [(len, (food_loc, tryOrder (world gs) [Order {ant = myant,
@@ -40,6 +57,7 @@ doTurn gp gs = do
                  | food_loc <- food gs,
                    myant <- myAnts (ants gs),
                    -- performs A* search to food
+                   -- let (nextPoint, len) = findAStar (world gs) (point myant) food_loc,
                    let path = findAStar (world gs) (point myant) food_loc,
                    let len = length path,
                    len /= 0,
@@ -52,25 +70,9 @@ doTurn gp gs = do
                (Turn {pointOrders = Map.empty, foodToAnts = Map.empty}) sortedFoodOrders
     -- Exploring the map
     -- Get free ants
-    freeAnts = [myant | myant <- myAnts (ants gs)]
-                -- myant `notElem` (map ant (Map.elems (pointOrders foodTurn)))]
+    freeAnts = [myant | myant <- myAnts (ants gs)]--,
+                --myant `notElem` (map ant (Map.elems (pointOrders foodTurn)))]
     --  explore map
-    exploreOrders = mapMaybe (exploreMap2 gs) freeAnts
-    expTurn = updateTurn (world gs) foodTurn
-              exploreOrders
-    -- combat orders
-    freeAnts2 = [myant | myant <- myAnts (ants gs),
-                 myant `notElem` (map ant (Map.elems (pointOrders expTurn)))]
-    --unblock our hills to enable spawning of our ants
-    hillOrders = [[Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = North},
-                   Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = West},
-                   Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = South},
-                   Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = East}]
-                 | h <- (hills gs),
-                   (hillPoint h) `elem` (map point (myAnts (ants gs)))]
-    unblockHillsOrders = mapMaybe (tryOrder (world gs)) hillOrders
-    hillTurn = updateTurn (world gs) expTurn unblockHillsOrders
-    orders = Map.elems $ pointOrders hillTurn
 
 -- Recursively update pointOrders of PointOrders type
 -- in Turn with orders in the list.

@@ -75,6 +75,7 @@ getNeighbors world p =
     wc = move West p
     sc = move South p
     ec = move East p
+{-# INLINE getNeighbors #-}
 
 -- A* using manhattan distance as heuristic
 findAStar :: World -> Point -> Point -> [Point]

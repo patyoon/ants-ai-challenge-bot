@@ -125,13 +125,14 @@ data MetaTile = MetaTile
                 { tile :: Tile,
                   visible :: Visible,
                   exploreValue :: ExploreValue
-                } deriving (Show)
+                } deriving (Show, Eq)
 
 data Owner = Me | Enemy1 | Enemy2 | Enemy3 deriving (Show, Eq, Bounded, Enum, Ord)
 
 data Ant = Ant
   { point :: Point
   , owner :: Owner
+  -- , path :: [Point]
   } deriving (Show, Eq, Ord)
 
 data Hill = Hill
@@ -502,25 +503,24 @@ updateExplore gp gs =
       newWorld = world gs // [(loc, MetaTile {tile = tile mt,
                                               visible = visible mt, exploreValue =
                                                 exploreValue mt + 1})
-                             | (loc, mt) <- (filter (filterStep gp gs True)
-                                             (assocs $ world gs))]
+                             | (loc, mt) <- ((assocs $ world gs) List.\\ withinTen)]
       newWorld'  = newWorld // [(loc, MetaTile {tile = tile mt,
                                                  visible = visible mt, exploreValue = 0})
                                 -- trace ("withinTen "++ show withinTen)
                                 | (loc, mt) <-  withinTen]
-                   -- trace ("\nmyants " ++ show (myAnts (ants gs)) ++"\n") $
   in gs {world = newWorld'}
 {-# INLINE updateExplore #-}
 
+-- trace ("\nmyants " ++ show (myAnts (ants gs)) ++"\n"++show (world gs)) $
 filterStep :: GameParams -> GameState -> Bool -> (Point, MetaTile) -> Bool
 filterStep gp gs filterTen (p, _)
   | null distList = filterTen
-  | filterTen && dist > 10 = True
-  | not filterTen && dist <= 10 = True
+  | filterTen && dist > 5 = True
+  | not filterTen && dist <= 5 = True
   | otherwise = False where
     myants = myAnts (ants gs)
     distList = List.sort $map ((distance gp p) . point) myants
-    dist = head distList
+    dist =  (head distList)
 {-# INLINE filterStep #-}
 
 -- initialize exploreValue to 0
