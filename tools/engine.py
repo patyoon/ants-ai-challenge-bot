@@ -64,7 +64,6 @@ def run_game(game, botcmds, options):
     input_logs = options.get('input_logs', [None]*len(botcmds))
     output_logs = options.get('output_logs', [None]*len(botcmds))
     error_logs = options.get('error_logs', [None]*len(botcmds))
-
     capture_errors = options.get('capture_errors', False)
     capture_errors_max = options.get('capture_errors_max', 510)
 

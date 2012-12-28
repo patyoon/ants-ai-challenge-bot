@@ -6,10 +6,15 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import BFS (exploreMap)
+import BFS (exploreMap, exploreMap2)
 import Ants
 import Data.Set (Set)
 import AStar (findAStar)
+import Debug.Trace (trace)
+
+traceThis :: (Show a) => a -> a
+traceThis x = trace (show x) x
+
 -- import AlphaBeta (runAlphaBeta)
 
 -- Picks the first passable order in a list
@@ -29,17 +34,17 @@ doTurn gp gs = do
   -- wrap list of orders back into a monad
   return (orders, explorePoints) where
     foodOrders = [(len, (food_loc, tryOrder (world gs) [Order {ant = myant,
-                                                                   direction = fst d},
-                                                            Order {ant = myant,
-                                                                   direction = snd d}]))
-                     | food_loc <- food gs,
-                       myant <- myAnts (ants gs),
-                       -- performs A* search to food
-                       let path = findAStar (world gs) (point myant) food_loc,
-                       let len = length path,
-                       len /= 0,
-                       let nextPoint = head path,
-                       let d = directions (world gs) (point myant) nextPoint]
+                                                               direction = fst d},
+                                                        Order {ant = myant,
+                                                               direction = snd d}]))
+                 | food_loc <- food gs,
+                   myant <- myAnts (ants gs),
+                   -- performs A* search to food
+                   let path = findAStar (world gs) (point myant) food_loc,
+                   let len = length path,
+                   len /= 0,
+                   let nextPoint = head path,
+                   let d = directions (world gs) (point myant) nextPoint]
     -- sort order based on the lenturnh of path
     sortedFoodOrders = map snd (sort foodOrders)
     -- foodTurn is Turn containing food orders
@@ -47,16 +52,16 @@ doTurn gp gs = do
                (Turn {pointOrders = Map.empty, foodToAnts = Map.empty}) sortedFoodOrders
     -- Exploring the map
     -- Get free ants
-    freeAnts = [myant | myant <- myAnts (ants gs),
-                myant `notElem` (map ant (Map.elems (pointOrders foodTurn)))]
+    freeAnts = [myant | myant <- myAnts (ants gs)]
+                -- myant `notElem` (map ant (Map.elems (pointOrders foodTurn)))]
     --  explore map
-    exploreOrdertuples = mapMaybe (exploreMap gs) freeAnts
-    expTurn = updateTurn (world gs) foodTurn $ map fst exploreOrdertuples
+    exploreOrdertuples = traceThis $ mapMaybe (exploreMap2 gs) freeAnts
+    expTurn = updateTurn (world gs) (Turn {pointOrders = Map.empty, foodToAnts = Map.empty})
+              $ map fst exploreOrdertuples
     explorePoints = Set.unions $ map snd exploreOrdertuples
     -- combat orders
     freeAnts2 = [myant | myant <- myAnts (ants gs),
                  myant `notElem` (map ant (Map.elems (pointOrders expTurn)))]
-
     --unblock our hills to enable spawning of our ants
     hillOrders = [[Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = North},
                    Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = West},

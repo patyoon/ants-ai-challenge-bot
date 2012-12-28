@@ -1,12 +1,18 @@
+{-# OPTIONS  -XScopedTypeVariables #-}
+
+
 module BFS where
 import Ants
 -- Ants also has type Nothing
 import Data.Maybe (Maybe)
 import qualified Data.Maybe as Maybe
-import Data.Set (Set)
+import Data.Set (Set, union, fromList, unions)
+import Data.List (foldl', find, sortBy)
 import qualified Data.Set as Set
 import qualified Data.List as List
 import Prelude
+import Debug.Trace (trace)
+import System.IO
 
 --Recursive function that performs the breadth first search
 bfs :: GameState ->
@@ -23,41 +29,62 @@ bfs gs queue reached = if (head queue) `elem` (unexplored gs)
 -- Returns children of the point that are passable and havent been reached
 getNeighbors :: GameState -> Point -> [Point] -> [Point]
 getNeighbors gs p reached =
-  [child | child <- [nc, wc, sc, ec], tile ((world gs) %! child) `notElem` [Water, MyHill],
+  [child | child <- [nc, wc, sc, ec], tile ((world gs) %! child)
+                                      `notElem` [Unknown, Water, MyHill],
    child `notElem` reached] where
-      nc = move North p
-      wc = move West p
-      sc = move South p
-      ec = move East p
+      nc = moveW (world gs) North p
+      wc = moveW (world gs) West p
+      sc = moveW (world gs) South p
+      ec = moveW (world gs) East p
 
 --perform BFS to explore Tiles
 exploreMap :: GameState -> Ant -> Maybe (Order, Set Point)
 exploreMap gs ant
-  | Maybe.isNothing dest = Maybe.Nothing
-  | otherwise = case possible_dir of Maybe.Nothing -> Maybe.Nothing
-                                     Just dir -> Just (dir, Set.empty)
-  where
-    dest = bfs gs [point ant] [point ant]
-    dir = directions (world gs) (point ant) (Maybe.fromMaybe (0, 0) dest)
-    possible_dir = List.find (passable (world gs)) [Order {ant = ant, direction = fst dir},
-                                           Order {ant = ant, direction = snd dir}]
+  = let dest =  bfs gs [point ant] [point ant]
+        dir = directions (world gs) (point ant) (Maybe.fromMaybe (0, 0) dest)
+        possible_order = List.find (passable (world gs)) [Order {ant = ant, direction = fst dir},
+                                                                       Order {ant = ant, direction = snd dir}] in
+    if Maybe.isNothing dest then Just (Order {ant = ant, direction = Ants.North}, Set.empty)
+    else case possible_order of
+      Maybe.Nothing -> Maybe.Nothing
+      Just order -> Just (order, Set.empty) where
 
 -- new exploration method!
 
--- -- Adds root point to the queue and initiates BFS
--- exploreMap :: GameState -> Ant -> Maybe (Order, Set Point)
--- exploreMap gs ant = case getNeighbors gs (point ant) [] of
---   [] -> Maybe.Nothing
---   children -> let dir = dfs gs 0 [] (point ant) (Set.fromList children)
---                   d = directions (world gs) (point ant) (head . sort) $ map fst dir
---                   in
---                Just (find (passable (world gs)) [Order {ant = ant, direction = fst d},
---                                                  Order {ant = ant, direction = snd d}],
---                     Set.unions (map snd dir))
+-- Adds root point to the queue and initiates BFS
+exploreMap2 :: GameState -> Ant -> Maybe (Order, Set Point)
+exploreMap2 gs ant = case getNeighbors gs (point ant) [] of
+  [] -> Maybe.Nothing
+  children -> let dir = sortBy sortTup $map (new_bfs gs) children
+                  d = directions (world gs) (point ant) $((\(x,y,z) -> x) . head) dir
+                  possible_order = find (passable
+                                         (world gs)) [Order {ant = ant,
+                                                             direction = fst d},
+                                                      Order {ant = ant,
+                                                             direction = snd d}]
+              in case possible_order of
+                Maybe.Nothing -> Maybe.Nothing
+                Just order -> Just (order, unions (map (\(x,y,z) -> z) dir))
 
--- --
--- dfs :: GameState -> Int -> [Point] -> Set Point -> Point -> (Int, Set Point)
--- dfs gs step reached point initSet =
---   let children = (getNeighbors gs point reached step) in
---   if step <= 10 then foldr (dfs gs (step+1) (reached ++ children) (Set.union initSet updateSet)) 0 children
---   else exploreValue $ (gs world) %! point
+sortTup (a1, b1, c1) (a2, b2, c2)
+  | b1 < b2 = GT
+  | b1 > b2 = LT| b1 == b2 = compare b1 b2
+
+new_bfs :: GameState -> Point -> (Point, Int, Set Point)
+new_bfs gs p = (p, val, initSet) where
+  (val, initSet) = bfs2 gs 1 [p] (0, Set.singleton p) [p]
+
+bfs2 :: GameState -- game state
+        -> Int -- number of step
+        -> [Point] -- Visited node queue
+        -> (Int, Set Point) -- tuple passed from
+        -> [Point] -- BFS Queue
+        -> (Int, Set Point)
+bfs2 _ _ _ tup [] = tup
+bfs2 gs step reached tup queue
+  | step <= 10 = foldl' (bfs2 gs (step+1) (reached ++ children)) (tup_union) (map (: (tail queue)) children)
+  | otherwise =  (e_val (head queue) + fst tup, snd tup) where
+    children = getNeighbors gs (head queue) reached
+    tup_union = (fst tup, union (snd tup) (fromList children))
+    e_val point = exploreValue ((world gs) %! point)
+{-# INLINE bfs2 #-}

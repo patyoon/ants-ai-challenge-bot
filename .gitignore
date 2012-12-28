@@ -2,5 +2,6 @@
 \#*
 *.o
 *.hi
+*.pyc
 *.DS_Store
 game_logs/

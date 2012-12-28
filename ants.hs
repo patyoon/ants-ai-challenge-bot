@@ -32,9 +32,9 @@ module Ants
        , colBound
        , unoccupied
        , unClaimedFood
-         -- main function
        , game
        , move
+       , moveW
        ) where
 
 import Data.Array
@@ -49,6 +49,7 @@ import qualified Data.List as List
 import Control.Applicative
 import Data.Time.Clock
 import System.IO
+import Debug.Trace (trace)
 
 -- type synonyms
 type Row = Int
@@ -299,6 +300,22 @@ move dir p
   | dir == West  = (row p, col p - 1)
   | otherwise    = (row p, col p + 1)
 {-# INLINE move #-}
+
+-- simulate move in dir and get the point after move
+moveW :: World -> Direction -> Point -> Point
+moveW w dir p
+  = let ixCol p = if col p >= 0 then col p `mod` (1 + colBound w)
+                  else col p + (1 + colBound w)
+        ixRow p = if row p >= 0 then row p `mod` (1 + rowBound w)
+                  else row p + (1+ rowBound w)
+        wrap p = (ixRow p, ixCol p)
+    in case dir of
+      Ants.Nothing -> wrap p
+      North -> wrap (row p - 1, col p)
+      South -> wrap (row p + 1, col p)
+      West  -> wrap (row p, col p - 1)
+      East  -> wrap (row p, col p + 1)
+{-# INLINE moveW #-}
 
 -- tests if the order is a valid one.
 passable :: World -> Order -> Bool
@@ -612,11 +629,11 @@ gameLoop gp gs doTurn = do
           gsu <- updateGame gp gsc
           (orders, explore_set) <- doTurn gp gsu
           -- set explore value to 0 for tiles within 10 steps
-          let gs' = initExploreValue gs explore_set
+          let gsu' = initExploreValue gsu explore_set
           hPutStrLn stderr $ show orders
           mapM_ issueOrder orders
           finishTurn
-          gameLoop gp gsu doTurn
+          gameLoop gp gsu' doTurn
       | "end" `isPrefixOf` line = endGame
       | otherwise = gameLoop gp gs doTurn -- ignore line
 
