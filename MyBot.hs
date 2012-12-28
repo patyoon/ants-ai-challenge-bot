@@ -11,9 +11,7 @@ import Ants
 import Data.Set (Set)
 import AStar (findAStar)
 import Debug.Trace (trace)
-
-traceThis :: (Show a) => a -> a
-traceThis x = trace (show x) x
+import Data.Ord
 
 -- import AlphaBeta (runAlphaBeta)
 
@@ -23,7 +21,7 @@ tryOrder :: World -> [Order] -> Maybe Order
 tryOrder w = find (passable w)
 
 -- creates orders. Called by updateTurn
-doTurn :: GameParams -> GameState -> IO ([Order])
+doTurn :: GameParams -> GameState -> IO ([Order], Set Point)
 doTurn gp gs = do
   --Food gathering.
   -- foodOrders :: [(path lenturnh, (Food, Maybe Order))]
@@ -33,29 +31,31 @@ doTurn gp gs = do
   hPutStrLn stderr $ show elapsedTime
   maybeExploreOrders <- mapM (exploreMap2 gs) freeAnts
   let exploreOrders = catMaybes maybeExploreOrders
-      expTurn = updateTurn (world gs) (Turn {pointOrders = Map.empty, foodToAnts = Map.empty})
-                    exploreOrders
-          -- combat orders
+      expTurn = updateTurn (world gs)  (foodTurn) -- trace ("foodTurn " ++show foodTurn)
+                    (map fst exploreOrders)
+      -- (Turn {pointOrders = Map.empty, foodToAnts = Map.empty}) --
       freeAnts2 = [myant | myant <- myAnts (ants gs),
-                       myant `notElem` (map ant (Map.elems (pointOrders expTurn)))]
+                   myant `notElem` (map ant (Map.elems (pointOrders expTurn)))]
           --unblock our hills to enable spawning of our ants
       hillOrders = [[Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = North},
                          Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = West},
                          Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = South},
                          Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = East}]
                        | h <- (hills gs),
-                         (hillPoint h) `elem` (map point (myAnts (ants gs)))]
+                         (hillPoint h) `elem` (map point freeAnts2)]
       unblockHillsOrders = mapMaybe (tryOrder (world gs)) hillOrders
-      hillTurn = updateTurn (world gs) expTurn unblockHillsOrders
+      hillTurn = updateTurn (world gs) (trace ("expTurn " ++ show expTurn) expTurn)
+                 unblockHillsOrders
       orders = Map.elems $ pointOrders hillTurn
   -- wrap list of orders back into a monad
-  return orders where
+  return (orders, Set.unions $map snd exploreOrders) where
     foodOrders = [(len, (food_loc, tryOrder (world gs) [Order {ant = myant,
                                                                direction = fst d},
                                                         Order {ant = myant,
                                                                direction = snd d}]))
                  | food_loc <- food gs,
-                   myant <- myAnts (ants gs),
+                   let myant = head $sortBy (comparing ((distance gp food_loc)
+                                                        . point)) (myAnts (ants gs)),
                    -- performs A* search to food
                    -- let (nextPoint, len) = findAStar (world gs) (point myant) food_loc,
                    let path = findAStar (world gs) (point myant) food_loc,
@@ -63,15 +63,15 @@ doTurn gp gs = do
                    len /= 0,
                    let nextPoint = head path,
                    let d = directions (world gs) (point myant) nextPoint]
-    -- sort order based on the lenturnh of path
-    sortedFoodOrders = map snd (sort foodOrders)
+    -- sort order based on the length of path
+    sortedFoodOrders = map snd (sort  foodOrders)
     -- foodTurn is Turn containing food orders
     foodTurn = updateTurnFood (world gs)
                (Turn {pointOrders = Map.empty, foodToAnts = Map.empty}) sortedFoodOrders
     -- Exploring the map
     -- Get free ants
-    freeAnts = [myant | myant <- myAnts (ants gs)]--,
-                --myant `notElem` (map ant (Map.elems (pointOrders foodTurn)))]
+    freeAnts = [myant | myant <- myAnts (ants gs),
+                myant `notElem` (map ant (Map.elems (pointOrders foodTurn)))]
     --  explore map
 
 -- Recursively update pointOrders of PointOrders type
@@ -86,7 +86,6 @@ updateTurn :: World -> Turn -> [Order] -> Turn
 updateTurn world turn [] = turn
 updateTurn world turn orders = updateTurn world (unoccupied turn
                                                  (head orders)) (tail orders)
-
 -- runs the game
 main :: IO ()
 main = game doTurn

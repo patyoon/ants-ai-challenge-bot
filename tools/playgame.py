@@ -110,7 +110,7 @@ def main(argv):
                       help="Run bots in serial, instead of parallel.")
 
     parser.add_option("--turntime", dest="turntime",
-                      default=10000, type="int",
+                      default=100000, type="int",
                       help="Amount of time to give each bot, in milliseconds")
     parser.add_option("--loadtime", dest="loadtime",
                       default=5000, type="int",

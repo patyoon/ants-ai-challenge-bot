@@ -147,6 +147,7 @@ instance Show Direction where
   show East  = "E"
   show South = "S"
   show West  = "W"
+  show Ants.Nothing = "-"
 
 -- Representation of an order
 data Order = Order
@@ -523,6 +524,17 @@ filterStep gp gs filterTen (p, _)
     dist =  (head distList)
 {-# INLINE filterStep #-}
 
+-- increment explore value by 1 in the beginning of the turn
+incrementExplore :: GameState ->  GameState
+incrementExplore gs =
+  let newWorld  = world gs // [(loc, MetaTile {tile = tile mt,
+                                               visible = visible mt, exploreValue =
+                                                 exploreValue mt + 1})
+                              | (loc, mt) <- (assocs $ world gs),
+                                tile mt `notElem` [MyAnt, MyHill, Water]]
+  in gs {world =  trace ("newworld" ++ show newWorld) newWorld}
+{-# INLINE incrementExplore #-}
+
 -- initialize exploreValue to 0
 initExploreValue :: GameState -> Set Point -> GameState
 initExploreValue gs setp
@@ -532,6 +544,7 @@ initExploreValue gs setp
                                 loc <- Set.toList setp,
                                 let mt = (world gs) %! loc]
     in gs {world = newWorld}
+{-# INLINE initExploreValue #-}
 
 -- recursively read input
 updateGame :: GameParams -> GameState -> IO GameState
@@ -635,7 +648,7 @@ endGame = do
   hPutStrLn stderr $ "Final scores: " ++ unwords (tail $ words scores)
 
 gameLoop :: GameParams -> GameState
-            -> (GameParams -> GameState -> IO [Order])
+            -> (GameParams -> GameState -> IO ([Order], Set Point))
                 -> IO ()
 gameLoop gp gs doTurn = do
   line <- getLine
@@ -645,17 +658,19 @@ gameLoop gp gs doTurn = do
       | "turn" `isPrefixOf` line = do
           hPutStrLn stderr line
           -- trace ("unexplored ="++ show (map (\x -> (x,world gs %!x))  (unexplored gs)))
-          let gsc =  (cleanState $ updateExplore gp gs)
+          let gsc =  (cleanState $ incrementExplore gs)
           gsu <- updateGame gp gsc
-          orders <- doTurn gp gsu
+          (orders, explore_set) <- doTurn gp gsu
+          -- set explore value to 0 for tiles within 10 steps
+          let gsu' = initExploreValue gsu explore_set
           hPutStrLn stderr $ show orders
           mapM_ issueOrder orders
           finishTurn
-          gameLoop gp gsu doTurn
+          gameLoop gp gsu' doTurn
       | "end" `isPrefixOf` line = endGame
       | otherwise = gameLoop gp gs doTurn -- ignore line
 
-game :: (GameParams -> GameState -> IO ([Order])) -> IO ()
+game :: (GameParams -> GameState -> IO ([Order], Set Point)) -> IO ()
 game doTurn = do
   paramInput <- gatherParamInput
   let gp = createParams $ map (tuplify2 . words) paramInput

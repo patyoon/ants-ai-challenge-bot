@@ -79,6 +79,6 @@ getNeighbors world p =
 
 -- A* using manhattan distance as heuristic
 findAStar :: World -> Point -> Point -> [Point]
-findAStar world source dest = trace "findAStar" (
+findAStar world source dest =
   fromMaybe [] (aStar source (getNeighbors world) (== dest)
-                (\x y -> 1) (manhattan (rowBound world, colBound world) source)))
+                (\x y -> 1) (manhattan (rowBound world, colBound world) source))
