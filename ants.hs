@@ -494,13 +494,34 @@ updateGameState gp gs s
     toPoint = tuplify2 . map read . words
 
 -- increment explore value by 1 in the beginning of the turn
-incrementExplore :: GameState ->  GameState
-incrementExplore gs =
-   let newWorld  = world gs // [(loc, MetaTile {tile = tile mt,
-                                             visible = visible mt, exploreValue =
-                                               exploreValue mt + 1})
-                             | (loc, mt) <- (assocs $ world gs)]
-  in gs {world = newWorld}
+-- set explore value to 0 for tiles within 10 steps
+updateExplore :: GameParams -> GameState ->  GameState
+updateExplore gp gs =
+  let withinTen = (filter (filterStep gp gs False)
+                   (assocs $ world gs))
+      newWorld = world gs // [(loc, MetaTile {tile = tile mt,
+                                              visible = visible mt, exploreValue =
+                                                exploreValue mt + 1})
+                             | (loc, mt) <- (filter (filterStep gp gs True)
+                                             (assocs $ world gs))]
+      newWorld'  = newWorld // [(loc, MetaTile {tile = tile mt,
+                                                 visible = visible mt, exploreValue = 0})
+                                -- trace ("withinTen "++ show withinTen)
+                                | (loc, mt) <-  withinTen]
+                   -- trace ("\nmyants " ++ show (myAnts (ants gs)) ++"\n") $
+  in gs {world = newWorld'}
+{-# INLINE updateExplore #-}
+
+filterStep :: GameParams -> GameState -> Bool -> (Point, MetaTile) -> Bool
+filterStep gp gs filterTen (p, _)
+  | null distList = filterTen
+  | filterTen && dist > 10 = True
+  | not filterTen && dist <= 10 = True
+  | otherwise = False where
+    myants = myAnts (ants gs)
+    distList = List.sort $map ((distance gp p) . point) myants
+    dist = head distList
+{-# INLINE filterStep #-}
 
 -- initialize exploreValue to 0
 initExploreValue :: GameState -> Set Point -> GameState
@@ -518,21 +539,20 @@ updateGame gp gs = do
   line <- getLine
   process line
   where
-    gs' = incrementExplore gs
     process line
       | "turn" `isPrefixOf` line = do
           hPutStrLn stderr line
-          updateGame gp gs'
+          updateGame gp gs
       | "go" `isPrefixOf` line   = do
           currentTime <- getCurrentTime
-          return GameState {world = world gs'
-                           , ants = ants gs'
-                           , food = food gs'
-                           , hills = hills gs'
-                           , unexplored = unexplored gs'
+          return GameState {world = world gs
+                           , ants = ants gs
+                           , food = food gs
+                           , hills = hills gs
+                           , unexplored = unexplored gs
                            , startTime = currentTime
                            }
-      | otherwise = updateGame gp $ updateGameState gp gs' line
+      | otherwise = updateGame gp $ updateGameState gp gs line
 
 -- Sets the tile to visible
 -- If the tile is still Unknown then it is land
@@ -613,10 +633,9 @@ endGame = do
   hPutStrLn stderr $ "Number of players: " ++ (words players !! 1)
   scores <- getLine
   hPutStrLn stderr $ "Final scores: " ++ unwords (tail $ words scores)
-  -- TODO print
 
 gameLoop :: GameParams -> GameState
-            -> (GameParams -> GameState -> IO ([Order], Set Point))
+            -> (GameParams -> GameState -> IO [Order])
                 -> IO ()
 gameLoop gp gs doTurn = do
   line <- getLine
@@ -625,19 +644,18 @@ gameLoop gp gs doTurn = do
     gameLoop' line
       | "turn" `isPrefixOf` line = do
           hPutStrLn stderr line
-          let gsc = cleanState gs
+          -- trace ("unexplored ="++ show (map (\x -> (x,world gs %!x))  (unexplored gs)))
+          let gsc =  (cleanState $ updateExplore gp gs)
           gsu <- updateGame gp gsc
-          (orders, explore_set) <- doTurn gp gsu
-          -- set explore value to 0 for tiles within 10 steps
-          let gsu' = initExploreValue gsu explore_set
+          orders <- doTurn gp gsu
           hPutStrLn stderr $ show orders
           mapM_ issueOrder orders
           finishTurn
-          gameLoop gp gsu' doTurn
+          gameLoop gp gsu doTurn
       | "end" `isPrefixOf` line = endGame
       | otherwise = gameLoop gp gs doTurn -- ignore line
 
-game :: (GameParams -> GameState -> IO ([Order], Set Point)) -> IO ()
+game :: (GameParams -> GameState -> IO ([Order])) -> IO ()
 game doTurn = do
   paramInput <- gatherParamInput
   let gp = createParams $ map (tuplify2 . words) paramInput

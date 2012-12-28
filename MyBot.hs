@@ -23,7 +23,7 @@ tryOrder :: World -> [Order] -> Maybe Order
 tryOrder w = find (passable w)
 
 -- creates orders. Called by updateTurn
-doTurn :: GameParams -> GameState -> IO ([Order], Set Point)
+doTurn :: GameParams -> GameState -> IO ([Order])
 doTurn gp gs = do
   --Food gathering.
   -- foodOrders :: [(path lenturnh, (Food, Maybe Order))]
@@ -32,7 +32,7 @@ doTurn gp gs = do
   elapsedTime <- timeRemaining gs
   hPutStrLn stderr $ show elapsedTime
   -- wrap list of orders back into a monad
-  return (orders, explorePoints) where
+  return orders where
     foodOrders = [(len, (food_loc, tryOrder (world gs) [Order {ant = myant,
                                                                direction = fst d},
                                                         Order {ant = myant,
@@ -55,10 +55,9 @@ doTurn gp gs = do
     freeAnts = [myant | myant <- myAnts (ants gs)]
                 -- myant `notElem` (map ant (Map.elems (pointOrders foodTurn)))]
     --  explore map
-    exploreOrdertuples = traceThis $ mapMaybe (exploreMap2 gs) freeAnts
-    expTurn = updateTurn (world gs) (Turn {pointOrders = Map.empty, foodToAnts = Map.empty})
-              $ map fst exploreOrdertuples
-    explorePoints = Set.unions $ map snd exploreOrdertuples
+    exploreOrders = mapMaybe (exploreMap2 gs) freeAnts
+    expTurn = updateTurn (world gs) foodTurn
+              exploreOrders
     -- combat orders
     freeAnts2 = [myant | myant <- myAnts (ants gs),
                  myant `notElem` (map ant (Map.elems (pointOrders expTurn)))]

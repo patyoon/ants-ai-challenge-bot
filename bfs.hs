@@ -52,11 +52,11 @@ exploreMap gs ant
 -- new exploration method!
 
 -- Adds root point to the queue and initiates BFS
-exploreMap2 :: GameState -> Ant -> Maybe (Order, Set Point)
+exploreMap2 :: GameState -> Ant -> Maybe Order
 exploreMap2 gs ant = case getNeighbors gs (point ant) [] of
   [] -> Maybe.Nothing
   children -> let dir = sortBy sortTup $map (new_bfs gs) children
-                  d = directions (world gs) (point ant) $((\(x,y,z) -> x) . head) dir
+                  d = directions (world gs) (point ant) $(fst . head) dir
                   possible_order = find (passable
                                          (world gs)) [Order {ant = ant,
                                                              direction = fst d},
@@ -64,27 +64,27 @@ exploreMap2 gs ant = case getNeighbors gs (point ant) [] of
                                                              direction = snd d}]
               in case possible_order of
                 Maybe.Nothing -> Maybe.Nothing
-                Just order -> Just (order, unions (map (\(x,y,z) -> z) dir))
+                Just order -> Just order
 
-sortTup (a1, b1, c1) (a2, b2, c2)
+sortTup (a1, b1) (a2, b2)
   | b1 < b2 = GT
   | b1 > b2 = LT| b1 == b2 = compare b1 b2
 
-new_bfs :: GameState -> Point -> (Point, Int, Set Point)
-new_bfs gs p = (p, val, initSet) where
-  (val, initSet) = bfs2 gs 1 [p] (0, Set.singleton p) [p]
+new_bfs :: GameState -> Point -> (Point, Int)
+new_bfs gs p = (p, val) where
+  val = bfs2 gs 1 [p] 0 [p]
 
 bfs2 :: GameState -- game state
         -> Int -- number of step
         -> [Point] -- Visited node queue
-        -> (Int, Set Point) -- tuple passed from
+        -> Int -- tuple passed from
         -> [Point] -- BFS Queue
-        -> (Int, Set Point)
-bfs2 _ _ _ tup [] = tup
-bfs2 gs step reached tup queue
-  | step <= 10 = foldl' (bfs2 gs (step+1) (reached ++ children)) (tup_union) (map (: (tail queue)) children)
-  | otherwise =  (e_val (head queue) + fst tup, snd tup) where
+        -> Int
+bfs2 _ _ _ val [] = val
+bfs2 gs step reached val queue
+  -- | (head queue) `elem` (unexplored gs) = val
+  | step <= 10 = foldl' (bfs2 gs (step+1) (reached ++ children)) val (map (: (tail queue)) children)
+  | otherwise =  e_val (head queue) + val where
     children = getNeighbors gs (head queue) reached
-    tup_union = (fst tup, union (snd tup) (fromList children))
     e_val point = exploreValue ((world gs) %! point)
 {-# INLINE bfs2 #-}
