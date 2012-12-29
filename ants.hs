@@ -49,6 +49,7 @@ import qualified Data.List as List
 import Control.Applicative
 import Data.Time.Clock
 import System.IO
+import Debug.Trace (trace)
 
 -- type synonyms
 type Row = Int
@@ -68,6 +69,7 @@ type PointOrders2 = Array Point Order
 
 -- Map mapping a food to an ant
 type FoodToAnt = Map Point Point
+type AntToPrev = Map Ant Point
 
 -- Column bound of the map
 colBound :: World -> Col
@@ -161,6 +163,7 @@ data GameState = GameState
   , startTime :: UTCTime
   , hills :: [Hill]
   , unexplored :: [Point]
+  , antToPrev :: AntToPrev
   }
 
 data GameParams = GameParams
@@ -396,7 +399,8 @@ addFood gs loc =
   GameState {world = newWorld, ants = ants gs,
              hills = hills gs, food = newFood,
              unexplored = unexplored gs List.\\ [loc],
-             startTime = startTime gs} where
+             startTime = startTime gs,
+             antToPrev = antToPrev gs} where
     newFood = loc:food gs
     w = world gs
     ev = getEVFromWorld w loc
@@ -428,7 +432,8 @@ addAnt :: GameParams -> GameState -> Point -> Owner -> GameState
 addAnt gp gs p own =
   GameState {world = newWorld, ants = newAnts, food = food gs,
              hills = hills gs,
-             unexplored = (unexplored gs) List.\\ (map (sumPoint p) (viewPoints gp)) ,
+             unexplored = (unexplored gs) List.\\ (map (sumPoint p) (viewPoints gp)),
+             antToPrev = antToPrev gs,
              startTime = startTime gs} where
     newAnts   = Ant {point = p, owner = own}:ants gs
     newWorld' = if own == Me
@@ -443,6 +448,7 @@ addDead gp gs p own =
   GameState {world = newWorld, ants = ants gs,
              hills = hills gs, food = food gs,
              unexplored = (unexplored gs) List.\\ (map (sumPoint p) (viewPoints gp)),
+             antToPrev = antToPrev gs,
              startTime = startTime gs} where
     newWorld' = if own == Me
                 then addVisible (world gs) (viewPoints gp) p
@@ -461,6 +467,7 @@ addHill gs p own =
   in GameState {world = newWorld, ants = ants gs,
                 food = food gs,
                 unexplored = unexplored gs List.\\ [p], hills = newHills,
+                antToPrev = antToPrev gs,
                 startTime = startTime gs}
 
 -- add Tile t to GameState at Point p
@@ -473,13 +480,14 @@ addWorldTile gs t p =
   in GameState {world = newWorld, ants = ants gs,
                 hills = hills gs, food = food gs,
                 unexplored = (unexplored gs) List.\\ [p],
+                antToPrev = antToPrev gs,
                 startTime = startTime gs}
 
 -- initialize GameState
 initialGameState :: GameParams -> UTCTime -> GameState
 initialGameState gp time =
   let w = listArray ((0,0), (rows gp - 1, cols gp - 1)) (repeat MetaTile {tile = Unknown, visible = False, exploreValue = 0})
-  in GameState {world = w, ants = [], food = [], hills = [], unexplored = [(row, col) | row <- [0 .. (rows gp -1)], col <- [0 .. (cols gp - 1)]], startTime = time}
+  in GameState {world = w, ants = [], food = [], hills = [], unexplored = [(row, col) | row <- [0 .. (rows gp -1)], col <- [0 .. (cols gp - 1)]], startTime = time, antToPrev = Map.empty}
 
 -- Update GameState with character information provided from STDIN.
 updateGameState :: GameParams -> GameState -> String -> GameState
@@ -560,6 +568,7 @@ updateGame gp gs = do
                            , food = food gs
                            , hills = hills gs
                            , unexplored = unexplored gs
+                           , antToPrev = antToPrev gs
                            , startTime = currentTime
                            }
       | otherwise = updateGame gp $ updateGameState gp gs line
@@ -591,7 +600,7 @@ clearMetaTile m
 -- Clears ants and food and sets tiles to invisible
 cleanState :: GameState -> GameState
 cleanState gs =
-  GameState {world = nw, ants = [], food = [], hills = [], unexplored = unexplored gs, startTime = startTime gs}
+  GameState {world = nw, ants = [], food = [], hills = [], unexplored = unexplored gs, startTime = startTime gs, antToPrev = antToPrev gs}
   where
     w = world gs
     invisibles = map clearMetaTile $ elems w
@@ -658,13 +667,19 @@ gameLoop gp gs doTurn = do
           gsu <- updateGame gp gsc
           (orders, explore_set) <- doTurn gp gsu
           -- set explore value to 0 for tiles within 10 steps
-          let gsu' = initExploreValue gsu explore_set
+          let gsu' = addPrevAntPos $initExploreValue gsu explore_set
           hPutStrLn stderr $ show orders
           mapM_ issueOrder orders
           finishTurn
           gameLoop gp gsu' doTurn
       | "end" `isPrefixOf` line = endGame
       | otherwise = gameLoop gp gs doTurn -- ignore line
+
+addPrevAntPos :: GameState -> GameState
+addPrevAntPos gs = gs {antToPrev = newAntToPrev}
+  where myants = map (\x -> (x, (point x))) (myAnts (ants gs))
+        newAntToPrev = Map.fromList (trace (show myants) myants)
+
 
 game :: (GameParams -> GameState -> IO ([Order], Set Point)) -> IO ()
 game doTurn = do

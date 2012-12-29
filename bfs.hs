@@ -4,13 +4,15 @@ import Ants
 import Data.Maybe (Maybe)
 import qualified Data.Maybe as Maybe
 import Data.Set (Set, union, fromList, unions)
-import Data.List (foldl', find, sortBy)
+import Data.Map (member, (!))
+import Data.List (foldl', find, sortBy, (\\))
 import qualified Data.Set as Set
 import qualified Data.List as List
 import Prelude
 import System.IO
 import System.Random (randomRIO)
 import Control.Monad
+import Debug.Trace(trace)
 
 pick :: [(Point, Point, Int, [Point])] -> IO (Point, Point, Int, [Point])
 pick xs
@@ -62,10 +64,13 @@ exploreMap2 :: GameState -> Ant -> IO (Maybe(Order, Set Point))
 exploreMap2 gs ant =
   case getNeighbors gs (point ant) [] of
     [] -> return (Maybe.Nothing)
-    children -> do let dirs = (sortBy sortTup $map (new_bfs gs) children)
+    children -> do let dirs = (sortBy sortTup $map (new_bfs gs ant) children)
                    choice <- pick dirs
                    let d1 = directions (world gs) (point ant) $(\(_,x,_,_)->x) choice
                        d2 = directions (world gs) (point ant) $(\(x,_,_,_)->x) choice
+                       prev = case ant `member` (trace ("prev " ++ show (antToPrev gs)) antToPrev gs) of
+                         True -> directions (world gs) (point ant) $(antToPrev gs) ! ant
+                         otherwise -> (Ants.Nothing, Ants.Nothing)
                        possible_order1 = filter (passable
                                                 (world gs)) [Order {ant = ant,
                                                                     direction = fst d1},
@@ -78,9 +83,13 @@ exploreMap2 gs ant =
                                                                      direction = snd d2}]
                        possible_order3 = filter (passable
                                                  (world gs)) $generateAllOrders ant d2
-                     in case possible_order2 of
-                     [] -> case possible_order1 of
-                       [] -> case possible_order3 of
+                       prev_orders = [Order {ant = ant,
+                                                  direction = fst prev},
+                                           Order {ant = ant,
+                                                  direction = snd prev}]
+                     in case possible_order2 \\ prev_orders of
+                     [] -> case possible_order1 \\ prev_orders of
+                       [] -> case possible_order3 \\ prev_orders of
                          [] -> return Maybe.Nothing
                          orders -> do order <- pickOrder orders
                                       return (Just (order, Set.fromList $(\(_,_,_,z)->z) choice))
@@ -98,9 +107,9 @@ sortTup (a1, b1, c1, d1) (a2, b2, c2, d2)
   | c1 > c2 = LT
   | c1 == c2 = EQ
 
-new_bfs :: GameState -> Point -> (Point, Point, Int, [Point])
-new_bfs gs p = (p, max_p, orig_val, reached) where
-  (orig_val, max_p, _, reached)= bfs2 gs 1 (0, p, 0, [p]) [p]
+new_bfs :: GameState -> Ant -> Point -> (Point, Point, Int, [Point])
+new_bfs gs ant p = (p, max_p, orig_val, reached) where
+  (orig_val, max_p, _, reached)= bfs2 gs 1 (0, p, 0, [p, point ant]) [p]
 
 bfs2 :: GameState -- game state
         -> Int -- number of step
