@@ -49,7 +49,6 @@ import qualified Data.List as List
 import Control.Applicative
 import Data.Time.Clock
 import System.IO
-import Debug.Trace (trace)
 
 -- type synonyms
 type Row = Int

@@ -12,7 +12,6 @@ import Prelude
 import System.IO
 import System.Random (randomRIO)
 import Control.Monad
-import Debug.Trace(trace)
 
 pick :: [(Point, Point, Int, [Point])] -> Maybe Point -> IO (Point, Point, Int, [Point])
 pick xs p
@@ -68,10 +67,10 @@ exploreMap2 gs ant =
   case (getNeighbors gs (point ant) []) of
     [] -> return (Maybe.Nothing)
     children -> do let dirs = (sortBy sortTup $map (new_bfs gs ant) children)
-                       prev = case ant `member` (trace ("prev " ++ show (antToPrev gs)) antToPrev gs) of
+                       prev = case ant `member` antToPrev gs of
                          True -> Just ((antToPrev gs) ! ant)
                          otherwise -> Maybe.Nothing
-                   choice <- trace ("dirs" ++ show (map (\(x,y,z,_) -> (x,y,z)) dirs)) (pick dirs prev)
+                   choice <- pick dirs prev
                    let d1 = directions (world gs) (point ant) $(\(_,x,_,_)->x) choice
                        d2 = directions (world gs) (point ant) $(\(x,_,_,_)->x) choice
                        possible_order1 = filter (passable

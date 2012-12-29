@@ -9,7 +9,6 @@ import Data.Set (Set)
 import Data.List (foldl')
 import Ants hiding (Nothing)
 import Data.Maybe (fromMaybe)
-import Debug.Trace (trace)
 
 data AStar a n = AStar { closedSet  :: !(Set Point),
                          openSetPQ :: !(PSQ Point Int),

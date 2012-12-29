@@ -11,8 +11,6 @@ import Ants
 import Data.Set (Set)
 import AStar (findAStar)
 import Data.Ord
-import Debug.Trace (trace)
--- import AlphaBeta (runAlphaBeta)
 
 -- Picks the first passable order in a list
 -- and returns Nothing if no such order exists
