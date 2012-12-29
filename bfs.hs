@@ -41,7 +41,7 @@ bfs gs queue reached = if (head queue) `elem` (unexplored gs)
 getNeighbors :: GameState -> Point -> [Point] -> [Point]
 getNeighbors gs p reached =
   [child | child <- [nc, wc, sc, ec], tile ((world gs) %! child)
-                                      `notElem` [Water, MyHill],
+                                      `notElem` [Water, MyHill, MyAnt],
    child `notElem` reached] where
       nc = moveW (world gs) North p
       wc = moveW (world gs) West p
@@ -65,7 +65,7 @@ exploreMap gs ant
 -- Adds root point to the queue and initiates BFS
 exploreMap2 :: GameState -> Ant -> IO (Maybe(Order, Set Point))
 exploreMap2 gs ant =
-  case getNeighbors gs (point ant) [] of
+  case (getNeighbors gs (point ant) []) of
     [] -> return (Maybe.Nothing)
     children -> do let dirs = (sortBy sortTup $map (new_bfs gs ant) children)
                        prev = case ant `member` (trace ("prev " ++ show (antToPrev gs)) antToPrev gs) of
@@ -108,16 +108,15 @@ bfs2 gs step tup@(orig_val, max_p, max_val, reached) queue
   -- | (head queue) `elem` (unexplored gs) = (-1, head queue, 0, reached)
   | step <= 10 = foldl' (bfs2 gs (step+1)) new_tup (map (: (tail queue)) children)
   | otherwise =  (e_val (head queue) + orig_val, new_point, new_val, reached) where
-    new_tup = (orig_val + (-10) * (length waters), new_point, new_val, reached ++ children)
+    new_tup = (orig_val, new_point, new_val, reached ++ children)
     (new_point, new_val) = if max_val < e_val (head queue)
                            then (head queue, e_val (head queue))
                            else (max_p, max_val)
     children = getNeighbors gs (head queue) reached
-    waters = getBlocks gs (head queue)
     e_val point = exploreValue ((world gs) %! point)
 {-# INLINE bfs2 #-}
 
--- Returns children of the point that are passable and havent been reached
+-- Returns water or hill neighbor of the point
 getBlocks :: GameState -> Point -> [Point]
 getBlocks gs p =
   [child | child <- [nc, wc, sc, ec], tile ((world gs) %! child)

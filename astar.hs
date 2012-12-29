@@ -70,7 +70,7 @@ aStar start neighbor isGoal cost heur
 
 getNeighbors :: World -> Point -> [Point]
 getNeighbors world p =
-  [n | n <- [nc, sc, wc, ec], tile (world %! n) `notElem` [Water, MyHill]] where
+  [n | n <- [nc, sc, wc, ec], tile (world %! n) `notElem` [MyAnt, Water, MyHill]] where
     nc = move North p
     wc = move West p
     sc = move South p
