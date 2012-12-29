@@ -46,7 +46,6 @@ searchGameTree gs myants@(mya:myas) enemyants@(ea:eas) depth isPlayer (alpha, be
                     else botSearch gs xs (maxVal, beta) where
                       (gs, value) = searchGameTree gs myas enemyants depth False (alpha, beta)
                       maxVal = max alpha value
-
                   aBOpponent :: GameState -> [Point] ->
                                 (Int, Int) -> (GameState, Int)
                   aBOpponent gs [] (_, beta) = (gs, beta)

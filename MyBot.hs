@@ -10,7 +10,6 @@ import BFS (exploreMap, exploreMap2)
 import Ants
 import Data.Set (Set)
 import AStar (findAStar)
-import Debug.Trace (trace)
 import Data.Ord
 
 -- import AlphaBeta (runAlphaBeta)
@@ -31,7 +30,7 @@ doTurn gp gs = do
   hPutStrLn stderr $ show elapsedTime
   maybeExploreOrders <- mapM (exploreMap2 gs) freeAnts
   let exploreOrders = catMaybes maybeExploreOrders
-      expTurn = updateTurn (world gs)  (foodTurn) -- trace ("foodTurn " ++show foodTurn)
+      expTurn = updateTurn (world gs)  (foodTurn)
                     (map fst exploreOrders)
       -- (Turn {pointOrders = Map.empty, foodToAnts = Map.empty}) --
       freeAnts2 = [myant | myant <- myAnts (ants gs),
@@ -44,7 +43,7 @@ doTurn gp gs = do
                        | h <- (hills gs),
                          (hillPoint h) `elem` (map point freeAnts2)]
       unblockHillsOrders = mapMaybe (tryOrder (world gs)) hillOrders
-      hillTurn = updateTurn (world gs) (trace ("expTurn " ++ show expTurn) expTurn)
+      hillTurn = updateTurn (world gs) expTurn
                  unblockHillsOrders
       orders = Map.elems $ pointOrders hillTurn
   -- wrap list of orders back into a monad

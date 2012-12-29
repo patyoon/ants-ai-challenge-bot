@@ -8,7 +8,6 @@ import Data.List (foldl', find, sortBy)
 import qualified Data.Set as Set
 import qualified Data.List as List
 import Prelude
-import Debug.Trace (trace)
 import System.IO
 import System.Random (randomRIO)
 import Control.Monad
@@ -64,9 +63,8 @@ exploreMap2 gs ant =
   case getNeighbors gs (point ant) [] of
     [] -> return (Maybe.Nothing)
     children -> do let dirs = (sortBy sortTup $map (new_bfs gs) children)
-                   choice <- pick $ trace ("DIRS ANT"++ (show ant) ++ "\nDIRS "++
-                                           show (map (\(x,y,z,_)->(x,y,z)) dirs)) dirs
-                   let d1 = directions (world gs) (point ant) $(\(_,x,_,_)->x) (trace ("Choice " ++ show choice) choice)
+                   choice <- pick dirs
+                   let d1 = directions (world gs) (point ant) $(\(_,x,_,_)->x) choice
                        d2 = directions (world gs) (point ant) $(\(x,_,_,_)->x) choice
                        possible_order1 = filter (passable
                                                 (world gs)) [Order {ant = ant,

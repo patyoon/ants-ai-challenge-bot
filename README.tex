@@ -1,4 +1,4 @@
-% Created 2012-12-18 Tue 22:22
+% Created 2012-12-28 Fri 19:20
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -33,13 +33,13 @@
 \tableofcontents
 \vspace*{1cm}
  \#+TITLE: CIS399-03 Final Project Writeup: HASKELL ANTS BOT
-
+ 
 \section{How to run code}
 \label{sec-1}
 
 
 ./make.sh to build the Ants.
-./run$_{\mathrm{game}}$$_{\mathrm{browser}}$.sh to simulate one game and display the replay on web browser.
+./run$_{\mathrm{game}}$$_{\mathrm{browser}}$.sh to simulate one game. After simulation is done, it will display the replay on web browser.
 \section{Source Code}
 \label{sec-2}
 
@@ -49,7 +49,6 @@
 \item Ants.hs : General ants related function
 \item MyAnts.hs : Contains DoTurn function which is executed in every turn.
 \item AStar.hs : Has A* algorithm implementation
-\item alphabeta.hs(unfinished, not included) : Alpha beta pruning implementation in minimax algorithm for combat
 \end{itemize}
  
 \section{External Packages Used}
@@ -68,28 +67,23 @@ I implemented A* Search, Breadth-First-Search(BFS), Depth-First-Search(DFS) for 
 
 At first I used BFS to find the first unexplored Point and move the ant toward it, but somehow it was not effective for diffusion ants to unexplored regions. (The current bot uses this strategy)
 
-Therefore I used a strategy inspired by the exploration strategy of xantis(\href{http://xathis.com/posts/ai-challenge-2011-ants.html}{http://xathis.com/posts/ai-challenge-2011-ants.html}) who is the winner of the aichallenge 2011. I assigned an exploreValue to each tile on the map which is increased by one at the beginning of each turn. In the explore stage, if a tile is reachable within 10 steps by free ants that are not assigned with any of the combat or food order, its exploreValue is reset to 0. We do this during the modified DFS which stops deepening at the detph(step) 11. Once we finish DFS upto 11 steps, we sum up all exploreValues of tiles reachable within 10 steps from each left, right, up, down direction and pick the direction with the maximum explore value. This was hard to implement in Haskell as I needed to update the exploreValue in a real time and the World data structure that keeps MetaTile data which ontains ExploreValue data is immutable. I haven't finished implementing this yet.
+Therefore I used a strategy inspired by the exploration strategy of xantis(\href{http://xathis.com/posts/ai-challenge-2011-ants.html}{http://xathis.com/posts/ai-challenge-2011-ants.html}) who is the winner of the aichallenge 2011. I assigned an exploreValue to each tile on the map which is increased by one at the beginning of each turn. In the explore stage, if a tile is reachable within 10 steps by free ants that are not assigned with any of the combat or food order, its exploreValue is reset to 0. We do this during the modified DFS which stops deepening at the detph(step) 11. Once we finish DFS upto 11 steps, we sum up all exploreValues of tiles reachable within 10 steps from each left, right, up, down direction and pick the direction with the maximum explore value. This was hard to implement in Haskell as I needed to update the exploreValue in a real time and the World data structure that keeps MetaTile data which ontains ExploreValue data is immutable. Exploration is much effective using this scheme, but somehow I have problem with Bots being stuck near my hill.
 \subsection{Pathfinding to Foods}
 \label{sec-4-2}
 
 
-I used A* search which uses cost+husristic for deciding which path to take. I used manhattan distance as the heuristic function as it never overestimates the actual cost(x+y distance).
-\subsection{Combat Strategy}
-\label{sec-4-3}
-
-
-I first find the group of my own ants and enemy ants that can be involved in the combat. (TODO: Need to figure out how to find this set) Then, I use minimax algorithm with alpha beta pruning to figure out the combat strategy for this local set of game. This portion of the Bot is still work in progress. The WIP can be found in alphabeta.hs.
+I used A* search which uses cost+husristic for deciding which path to take. I used manhattan distance as the heuristic function as it never overestimates the actual cost(x+y distance). In each turn, I assign the closest ant to each food and the path between the food and the ant is obtained using AStar algorithm. I compute the path in each turn instead of following the path after I compute it in the first time as the food may be taken by other ants or the path may be blocked by other ants. This turned out to take majority of the computation time, so as a future modification, I would need to check if the food is taken or the path is blocked by other ants, and abandon or re-compute the path if needed.  
 \section{Recursion?}
 \label{sec-5}
 
 
 The game loop is basically implemented using recursion. I used the basic framework from the Starter Package, but modified the data types and added helper functions to accomodate by need for pathfinding for foods and enemy hills. It took a while to understand the game logic and how the looping in implemented in Haskell using loops. 
 
-AStar and BFS uses recursion. Also updateTurn functions uses recursion to add orders to Turn data recursively. I also tried to implement minimax algorithm using haskell, but it turned out to be hard because I haven't figure out the evalution function yet (I adopted an idea from xathis's bot using number of dead enemy ants and dead my ants, but the function itself needed implemetation of defining local set of ants involved in the combat which I haven't figure out how to implement in Haskell..)
+AStar and BFS uses recursion. Also updateTurn functions uses recursion to add orders to Turn data recursively. 
 \section{Takeaways}
 \label{sec-6}
 
 
-I have implemented ants bot in Python and it was much easier to implement various strategy because I could keep the state in the program and didn't need to pass around immutation data strauctures in recursion. But I learned a lot about using recursion to implement recursive algorithm involving state changes in Haskell and wish I had enough time to go deeper and implement all akgorithms I first came up with. I enjoyed doing research on various AI alrogithms for game agent including other Ants implementation strategies and general papers including ``(Rehman Tariq Butt) Performance Comparison of AI Algorithms'', especially the anytime algorithm should be useful because I found my ants timeout after the number of ants goes over a certain amount(I manually increased turntime in the included simulation file.). Overall it was very enjoyable to implementing Ants in Haskell.
+I have implemented ants bot in Python and it was much easier to implement various strategy because I could keep the state in the program and didn't need to pass around immutation data strauctures in recursion. But I learned a lot about using recursion to implement recursive algorithm involving state changes in Haskell and wish I had enough time to go deeper and implement all akgorithms I first came up with. I enjoyed doing research on various AI alrogithms for game agent including other Ants implementation strategies and general papers including ``(Rehman Tariq Butt) Performance Comparison of AI Algorithms'', especially the anytime algorithm should be useful because I found my ants timeout after the number of ants goes over a certain amount (I manually increased turntime in the included simulation file.). Overall it was very enjoyable to implementing Ants in Haskell.
 
 \end{document}

@@ -49,7 +49,6 @@ import qualified Data.List as List
 import Control.Applicative
 import Data.Time.Clock
 import System.IO
-import Debug.Trace (trace)
 
 -- type synonyms
 type Row = Int
@@ -507,12 +506,10 @@ updateExplore gp gs =
                              | (loc, mt) <- ((assocs $ world gs) List.\\ withinTen)]
       newWorld'  = newWorld // [(loc, MetaTile {tile = tile mt,
                                                  visible = visible mt, exploreValue = 0})
-                                -- trace ("withinTen "++ show withinTen)
                                 | (loc, mt) <-  withinTen]
   in gs {world = newWorld'}
 {-# INLINE updateExplore #-}
 
--- trace ("\nmyants " ++ show (myAnts (ants gs)) ++"\n"++show (world gs)) $
 filterStep :: GameParams -> GameState -> Bool -> (Point, MetaTile) -> Bool
 filterStep gp gs filterTen (p, _)
   | null distList = filterTen
@@ -532,7 +529,7 @@ incrementExplore gs =
                                                  exploreValue mt + 1})
                               | (loc, mt) <- (assocs $ world gs),
                                 tile mt `notElem` [MyAnt, MyHill, Water]]
-  in gs {world =  trace ("newworld" ++ show newWorld) newWorld}
+  in gs {world = newWorld}
 {-# INLINE incrementExplore #-}
 
 -- initialize exploreValue to 0
@@ -657,7 +654,6 @@ gameLoop gp gs doTurn = do
     gameLoop' line
       | "turn" `isPrefixOf` line = do
           hPutStrLn stderr line
-          -- trace ("unexplored ="++ show (map (\x -> (x,world gs %!x))  (unexplored gs)))
           let gsc =  (cleanState $ incrementExplore gs)
           gsu <- updateGame gp gsc
           (orders, explore_set) <- doTurn gp gsu
