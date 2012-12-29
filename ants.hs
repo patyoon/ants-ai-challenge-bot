@@ -537,7 +537,11 @@ incrementExplore gs =
                                                  exploreValue mt + 1})
                               | (loc, mt) <- (assocs $ world gs),
                                 tile mt `notElem` [MyAnt, MyHill, Water]]
-  in gs {world = newWorld}
+      newWorld'  = newWorld // [(loc, MetaTile {tile = tile mt,
+                                                visible = visible mt, exploreValue = -10})
+                               | (loc, mt) <-  (assocs $ world gs),
+                                 tile mt `elem` [MyAnt, MyHill]]
+  in gs {world = newWorld'}
 {-# INLINE incrementExplore #-}
 
 -- initialize exploreValue to 0
@@ -667,7 +671,7 @@ gameLoop gp gs doTurn = do
           gsu <- updateGame gp gsc
           (orders, explore_set) <- doTurn gp gsu
           -- set explore value to 0 for tiles within 10 steps
-          let gsu' = addPrevAntPos $initExploreValue gsu explore_set
+          let gsu' = addPrevAntPos orders $initExploreValue gsu explore_set
           hPutStrLn stderr $ show orders
           mapM_ issueOrder orders
           finishTurn
@@ -675,11 +679,13 @@ gameLoop gp gs doTurn = do
       | "end" `isPrefixOf` line = endGame
       | otherwise = gameLoop gp gs doTurn -- ignore line
 
-addPrevAntPos :: GameState -> GameState
-addPrevAntPos gs = gs {antToPrev = newAntToPrev}
+addPrevAntPos :: [Order] -> GameState -> GameState
+addPrevAntPos orders gs = gs {antToPrev = newAntToPrev}
   where myants = map (\x -> (x, (point x))) (myAnts (ants gs))
-        newAntToPrev = Map.fromList (trace (show myants) myants)
-
+        newPoint order = move (direction order) ((point . ant) order)
+        ordered = map (\x -> (Ant {point = newPoint x,
+                                   owner = (owner . ant) x}, newPoint x)) orders
+        newAntToPrev = Map.union (Map.fromList ordered) $Map.fromList myants
 
 game :: (GameParams -> GameState -> IO ([Order], Set Point)) -> IO ()
 game doTurn = do

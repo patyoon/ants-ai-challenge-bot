@@ -14,10 +14,13 @@ import System.Random (randomRIO)
 import Control.Monad
 import Debug.Trace(trace)
 
-pick :: [(Point, Point, Int, [Point])] -> IO (Point, Point, Int, [Point])
-pick xs
-  | all ((== 0) . \(_,_,y,_)->y) xs = randomRIO (0, (length xs - 1)) >>= return . (xs !!)
-  | otherwise = do return $ head xs
+pick :: [(Point, Point, Int, [Point])] -> Maybe Point -> IO (Point, Point, Int, [Point])
+pick xs p
+  | all ((== 0) . \(_,_,y,_)->y) xs = randomRIO (0, (length xs - 1)) >>= return . (xs' !!)
+  | otherwise = do return $ head xs' where
+                     xs' = case p of
+                       Maybe.Nothing -> xs
+                       Just point -> filter (\(x,_,_,_) -> x /= point) xs
 
 pickOrder :: [a] -> IO a
 pickOrder xs = randomRIO (0, (length xs - 1)) >>= return . (xs !!)
@@ -65,12 +68,12 @@ exploreMap2 gs ant =
   case getNeighbors gs (point ant) [] of
     [] -> return (Maybe.Nothing)
     children -> do let dirs = (sortBy sortTup $map (new_bfs gs ant) children)
-                   choice <- pick dirs
+                       prev = case ant `member` (trace ("prev " ++ show (antToPrev gs)) antToPrev gs) of
+                         True -> Just ((antToPrev gs) ! ant)
+                         otherwise -> Maybe.Nothing
+                   choice <- trace ("dirs" ++ show (map (\(x,y,z,_) -> (x,y,z)) dirs)) (pick dirs prev)
                    let d1 = directions (world gs) (point ant) $(\(_,x,_,_)->x) choice
                        d2 = directions (world gs) (point ant) $(\(x,_,_,_)->x) choice
-                       prev = case ant `member` (trace ("prev " ++ show (antToPrev gs)) antToPrev gs) of
-                         True -> directions (world gs) (point ant) $(antToPrev gs) ! ant
-                         otherwise -> (Ants.Nothing, Ants.Nothing)
                        possible_order1 = filter (passable
                                                 (world gs)) [Order {ant = ant,
                                                                     direction = fst d1},
@@ -81,26 +84,10 @@ exploreMap2 gs ant =
                                                                      direction = fst d2},
                                                               Order {ant = ant,
                                                                      direction = snd d2}]
-                       possible_order3 = filter (passable
-                                                 (world gs)) $generateAllOrders ant d2
-                       prev_orders = [Order {ant = ant,
-                                                  direction = fst prev},
-                                           Order {ant = ant,
-                                                  direction = snd prev}]
-                     in case possible_order2 \\ prev_orders of
-                     [] -> case possible_order1 \\ prev_orders of
-                       [] -> case possible_order3 \\ prev_orders of
-                         [] -> return Maybe.Nothing
-                         orders -> do order <- pickOrder orders
-                                      return (Just (order, Set.fromList $(\(_,_,_,z)->z) choice))
-                       orders -> do order <- pickOrder orders
-                                    return (Just (order, Set.fromList $(\(_,_,_,z)->z) choice))
+                     in case possible_order2 of
+                     [] -> return Maybe.Nothing
                      orders -> do order <- pickOrder orders
                                   return (Just (order, Set.fromList $(\(_,_,_,z)->z) choice))
-
-generateAllOrders :: Ant -> (Direction, Direction) -> [Order]
-generateAllOrders ant (d1, d2) = map (\x -> Order {ant = ant, direction = x}) dirs where
-  dirs = [West, East, South, North] List.\\ [d1, d2]
 
 sortTup (a1, b1, c1, d1) (a2, b2, c2, d2)
   | c1 < c2 = GT
@@ -121,10 +108,21 @@ bfs2 gs step tup@(orig_val, max_p, max_val, reached) queue
   -- | (head queue) `elem` (unexplored gs) = (-1, head queue, 0, reached)
   | step <= 10 = foldl' (bfs2 gs (step+1)) new_tup (map (: (tail queue)) children)
   | otherwise =  (e_val (head queue) + orig_val, new_point, new_val, reached) where
-    new_tup = (orig_val, new_point, new_val, reached ++ children)
+    new_tup = (orig_val + (-10) * (length waters), new_point, new_val, reached ++ children)
     (new_point, new_val) = if max_val < e_val (head queue)
                            then (head queue, e_val (head queue))
                            else (max_p, max_val)
     children = getNeighbors gs (head queue) reached
+    waters = getBlocks gs (head queue)
     e_val point = exploreValue ((world gs) %! point)
 {-# INLINE bfs2 #-}
+
+-- Returns children of the point that are passable and havent been reached
+getBlocks :: GameState -> Point -> [Point]
+getBlocks gs p =
+  [child | child <- [nc, wc, sc, ec], tile ((world gs) %! child)
+                                      `elem` [Water, MyHill]] where
+    nc = moveW (world gs) North p
+    wc = moveW (world gs) West p
+    sc = moveW (world gs) South p
+    ec = moveW (world gs) East p

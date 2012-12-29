@@ -41,7 +41,7 @@ doTurn gp gs = do
                          Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = South},
                          Order{ant = Ant{point =(hillPoint h), owner = Me}, direction = East}]
                        | h <- (hills gs),
-                         (hillPoint h) `elem` (map point freeAnts2)]
+                         (hillPoint h) `elem` (map point (myAnts (ants gs)))]
       unblockHillsOrders = mapMaybe (tryOrder (world gs)) hillOrders
       hillTurn = updateTurn (world gs) expTurn
                  unblockHillsOrders
