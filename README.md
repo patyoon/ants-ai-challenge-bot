@@ -1,4 +1,4 @@
 ants-ai-challenge-bot
 =====================
 
-An Haskell Ants AI challenge Bot
+A Haskell Ants AI challenge Bot
