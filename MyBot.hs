@@ -68,7 +68,7 @@ doTurn gp gs = do
                                                         Order {ant = closest,
                                                                direction = snd d}]))
                  | food_loc <- food gs,
-                   let freeAnts = myAnts (ants gs),
+                   let freeAnts = filter (\x -> myAnts (ants gs),
                    let closest = head $sortBy (comparing ((distance gp food_loc)
                                                         . point)) freeAnts,
                    -- performs A* search to food
